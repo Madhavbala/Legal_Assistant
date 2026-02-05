@@ -1,46 +1,24 @@
 import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-
-# Keyword lists for clause classification
-IP_PATTERNS = [
-    r"intellectual\s+property|IP|ownership|assign|license|royalty|exclusive|non-compete",
-    r"trade\s+secret|patent|copyright|trademark"
-]
-
-OBLIGATION_KW = ["shall", "must", "obligation", "liable", "responsible"]
-RIGHT_KW = ["right", "entitled", "may", "permitted"]
-PROHIBIT_KW = ["prohibited", "shall not", "cannot", "restrict"]
 
 def extract_entities(text: str) -> dict:
-    """Extract entities using regex + NLTK."""
+    """Pure regex entity extraction."""
     text_lower = text.lower()
     
-    entities = {
-        "IP_TERMS": re.findall("|".join(IP_PATTERNS), text, re.I),
-        "ORG": re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b(?<!Inc\.|Ltd\.)", text),
-        "MONEY": re.findall(r"₹?\s*\d+(?:,\d{3})*(?:\.\d{2})?", text),
-        "DATE": re.findall(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", text)
+    return {
+        "IP_TERMS": re.findall(r'intellectual\s+property|IP|ownership|assign|license|exclusive|non-compete|patent|copyright', text, re.I),
+        "ORG": re.findall(r'\b[A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]{2,})?\b', text),
+        "MONEY": re.findall(r'₹?\s*[\d,]+\.?\d*\s*(?:lakh|crore|thousand)?', text),
+        "DATE": re.findall(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', text),
+        "CLAUSE_TYPE": "obligation"  # Default
     }
-    
-    # Clause classification (THE MISSING FUNCTION)
-    tokens = word_tokenize(text.lower())
-    scores = {"obligation": 0, "right": 0, "prohibition": 0}
-    
-    for token in tokens:
-        if token in OBLIGATION_KW: 
-            scores["obligation"] += 1
-        if token in RIGHT_KW: 
-            scores["right"] += 1
-        if token in PROHIBIT_KW: 
-            scores["prohibition"] += 1
-    
-    entities["CLAUSE_TYPE"] = max(scores, key=scores.get)
-    
-    return entities
 
 def classify_clause_type(text: str) -> str:
-    """Classify clause as obligation/right/prohibition."""
-    entities = extract_entities(text)
-    return entities["CLAUSE_TYPE"]
+    """Simple keyword classification."""
+    text_lower = text.lower()
+    if any(word in text_lower for word in ['shall', 'must', 'obligation']):
+        return "obligation"
+    elif any(word in text_lower for word in ['right', 'entitled', 'may']):
+        return "right"
+    elif any(word in text_lower for word in ['prohibited', 'cannot', 'restrict']):
+        return "prohibition"
+    return "neutral"
