@@ -2,37 +2,30 @@ import json
 import os
 from datetime import datetime
 
-AUDIT_FILE = os.path.join("data", "audit_logs.json")
+AUDIT_FILE = "data/audit_logs.json"
 
-def log_audit(results, language="unknown"):
+def log_audit(results: list, language: str = "unknown"):
+    """Log analysis results."""
     os.makedirs("data", exist_ok=True)
-
+    
     audit_entry = {
         "timestamp": datetime.utcnow().isoformat(),
         "language": language,
         "total_clauses": len(results),
-        "clauses": []
+        "avg_risk": sum(r["score"] for r in results) / len(results),
+        "clauses": [{"risk": r["risk"], "score": r["score"]} for r in results]
     }
-
-    for r in results:
-        audit_entry["clauses"].append({
-            "clause": r["clause"],
-            "ownership": r["analysis"].get("ownership"),
-            "exclusivity": r["analysis"].get("exclusivity"),
-            "risk": r.get("risk"),
-            "score": r.get("score")
-        })
-
+    
+    # Append to existing logs
     if os.path.exists(AUDIT_FILE):
-        try:
-            with open(AUDIT_FILE, "r", encoding="utf-8") as f:
+        with open(AUDIT_FILE, "r", encoding="utf-8") as f:
+            try:
                 data = json.load(f)
-        except json.JSONDecodeError:
-            data = []
+            except:
+                data = []
     else:
         data = []
-
+    
     data.append(audit_entry)
-
     with open(AUDIT_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(data, indent=2, ensure_ascii=False)
