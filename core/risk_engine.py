@@ -1,40 +1,36 @@
-import nltk
-from nltk.text import TextCollection
-from nltk.tokenize import word_tokenize
-nltk.download('punkt', quiet=True)
-
-def detect_ambiguity(clause: str) -> str:
-    """NLTK-based ambiguity score."""
-    tokens = word_tokenize(clause)
-    text = TextCollection([clause])
-    avg_similarity = sum(text.similarity(' '.join(tokens[:5]), ' '.join(tokens[5:])) for _ in range(3)) / 3
-    return "High" if avg_similarity > 0.4 else "Low"
-
-def calculate_risk(analysis: dict, entities: dict, clause_type: str) -> tuple[str, int]:
-    """Composite risk scoring."""
+def calculate_ip_risk(llm_result: dict) -> tuple[str, int]:
+    """
+    Calculate IP risk score (0-100) and level (Low/Medium/High).
+    Returns: (risk_level, score)
+    """
     score = 0
     
-    # LLM factors (60%)
-    if analysis.get("ownership") == "assigned":
-        score += 40
-    if analysis.get("exclusivity") == "exclusive":
-        score += 25
-    if analysis.get("favor") == "one-sided":
-        score += 20
+    # Extract LLM analysis
+    ownership = llm_result.get("ownership", "").lower()
+    exclusivity = llm_result.get("exclusivity", "").lower()
+    favor = llm_result.get("favor", "").lower()
     
-    # Entity risks (20%)
-    if entities.get("IP_TERMS"):
-        score += 15
+    # Risk weights
+    if "assigned" in ownership:
+        score += 40  # High risk
+    elif "licensed" in ownership:
+        score += 20  # Medium risk
     
-    # Clause type (10%)
-    if clause_type == "prohibition":
-        score += 10
+    if "exclusive" in exclusivity:
+        score += 30  # High exclusivity risk
     
-    # Ambiguity (10%)
-    if detect_ambiguity(analysis.get("clause_text", "")) == "High":
-        score += 10
+    if "one-sided" in favor:
+        score += 25  # Unbalanced terms
     
+    # Cap at 100
     score = min(score, 100)
     
-    risk_level = "High" if score >= 60 else "Medium" if score >= 30 else "Low"
+    # Risk level
+    if score >= 60:
+        risk_level = "High"
+    elif score >= 30:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+    
     return risk_level, score
