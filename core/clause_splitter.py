@@ -1,21 +1,22 @@
 import nltk
-from core.language import get_nlp_pipeline
-
-nltk.download('punkt', quiet=True)
+from nltk.tokenize import sent_tokenize
+from core.entities import extract_entities
 
 def split_clauses(text: str, lang: str = "en") -> list[str]:
-    """spaCy sentence detection + regex fallback."""
-    nlp = get_nlp_pipeline(lang)
+    """NLTK sent_tokenize + legal pattern split."""
+    # NLTK sentence tokenizer (excellent for legal docs)
+    sentences = sent_tokenize(text)
     
-    # spaCy sentence splitting (accurate for legal docs)
-    doc = nlp(text)
-    clauses = [sent.text.strip() for sent in doc.sents if len(sent.text.strip()) > 40]
+    # Legal clause patterns
+    import re
+    clauses = []
+    for sent in sentences:
+        if len(sent.strip()) > 30:
+            # Split on numbered clauses
+            clause_splits = re.split(r'(?i)(?:section|clause|धारा|अनुच्छेद)\s+\d+', sent)
+            clauses.extend([cs.strip() for cs in clause_splits if len(cs.strip()) > 40])
     
-    if len(clauses) < 3:
-        # Fallback regex
-        import re
-        patterns = [r"\d+\.", r"Section\s+\d+", r"धारा\s+\d+"] if lang == "en" else [r"धारा\s+\d+", r"\d+\."]
-        clauses = re.split("|".join(patterns), text)
-        clauses = [c.strip() for c in clauses if len(c.strip()) > 40][:20]
+    if not clauses:
+        clauses = [s.strip() for s in sentences if len(s.strip()) > 40][:15]
     
     return clauses
