@@ -51,7 +51,7 @@ def analyze_clause_with_llm(clause_text: str, lang: str) -> dict:
     try:
         client = get_client()
         response = client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": "ONLY valid JSON. No markdown/text."},
                 {"role": "user", "content": get_prompt(clause_text, lang)}
