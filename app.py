@@ -62,20 +62,38 @@ def calculate_risk(clause):
     risk_level = "High" if score >= 60 else "Medium" if score >= 30 else "Low"
     return risk_level, score
 
+# **FIXED PDF UPLOAD FUNCTION**
 def read_pdf(file):
-    text = ""
-    with fitz.open(stream=file.read(), filetype="pdf") as doc:
-        for page in doc:
-            text += page.get_text()
-    return re.sub(r'\s+', ' ', text).strip()
+    """Robust PDF reading with error handling"""
+    try:
+        # Reset file pointer
+        file.seek(0)
+        
+        # Open with PyMuPDF
+        with fitz.open(stream=file.read(), filetype="pdf") as doc:
+            text = ""
+            for page in doc:
+                page_text = page.get_text()
+                if page_text.strip():  # Only add non-empty pages
+                    text += page_text + "\n"
+        
+        # Clean and return
+        cleaned_text = re.sub(r'\s+', ' ', text.strip())
+        return cleaned_text if cleaned_text else "No readable text found in PDF"
+    
+    except Exception as e:
+        return f"PDF reading error: {str(e)}"
 
 def get_input_text(mode):
     if mode == "Upload File":
-        uploaded = st.file_uploader("Upload Contract (PDF)", type=["pdf"])
-        if uploaded:
-            return read_pdf(uploaded)
+        uploaded = st.file_uploader("Upload Contract (PDF)", type=["pdf"], key="pdf_upload")
+        if uploaded is not None:
+            st.info(f"File uploaded: {uploaded.name} ({uploaded.size} bytes)")
+            text = read_pdf(uploaded)
+            st.success("PDF processed successfully")
+            return text
         return ""
-    return st.text_area("Paste contract text:", height=300)
+    return st.text_area("Paste contract text:", height=300, key="text_area")
 
 def create_pdf_report(results):
     buffer = BytesIO()
@@ -91,7 +109,6 @@ def create_pdf_report(results):
     story.append(Paragraph(f"Composite Risk Score: {avg_score:.0f}/100", styles['Heading2']))
     
     for i, r in enumerate(results, 1):
-        risk_color = "red" if r["risk"] == "High" else "orange" if r["risk"] == "Medium" else "green"
         story.append(Paragraph(f"Clause {i} - {r['risk']} Risk ({r['score']}/100)", styles['Heading3']))
         story.append(Paragraph(r['clause'][:400] + "..." if len(r['clause']) > 400 else r['clause'], styles['Normal']))
         story.append(Spacer(1, 12))
@@ -155,10 +172,10 @@ if st.button("Analyze Contract", use_container_width=True) and raw_text.strip():
 **Risk score (0-100):** **{score}** ({risk_level})
         """)
         
-        st.markdown("Why this is risky")
+        st.markdown("**Why this is risky**")
         st.warning(explanation)
         
-        st.markdown("Suggested Fix")
+        st.markdown("**Suggested Fix**")
         if score >= 60:
             st.success("Negotiate IP retention, liability caps, mutual termination rights")
         elif score >= 30:
