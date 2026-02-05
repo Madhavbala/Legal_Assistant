@@ -1,92 +1,63 @@
 import streamlit as st
+from core.parser import get_input_text
+from core.language import detect_language
+from core.clause_splitter import split_clauses
+from core.llm_engine import analyze_clause_with_llm
+from core.risk_engine import calculate_ip_risk
+from core.entities import extract_entities
+from core.audit import log_audit
+from utils.helpers import export_pdf
 
-# Safe imports with error handling
-try:
-    from core.parser import get_input_text
-    from core.language import detect_language
-    from core.clause_splitter import split_clauses
-    from core.llm_engine import analyze_clause_with_llm
-    from core.risk_engine import calculate_ip_risk
-    from core.entities import extract_entities, classify_clause_type  # NOW FIXED
-    from core.audit import log_audit
-    from utils.helpers import export_pdf
-except ImportError as e:
-    st.error(f"❌ Import error: {e}")
-    st.stop()
+st.set_page_config(layout="wide")
+st.title("📄 Legal Contract Risk Analyzer")
 
-st.set_page_config(page_title="Legal Contract Risk Analyzer", layout="wide")
-st.title("🤖 GenAI Legal Assistant for Indian SMEs")
-
-st.sidebar.markdown("## 📋 Features")
-st.sidebar.markdown("- IP/Non-compete detection")
-st.sidebar.markdown("- Hindi + English")
-st.sidebar.markdown("- Risk scoring 0-100")
-st.sidebar.markdown("- PDF export")
-
-mode = st.radio("Input:", ["Upload File", "Paste Text"], horizontal=True)
+mode = st.radio("Input", ["Upload File", "Paste Text"])
 raw_text = get_input_text(mode)
 
-if st.button("🚀 Analyze Contract", use_container_width=True) and raw_text.strip():
-    if len(raw_text) < 50:
-        st.warning("⚠️ Need more text")
-        st.stop()
-    
+if st.button("🚀 ANALYZE", use_container_width=True) and raw_text.strip():
     lang = detect_language(raw_text)
-    clauses = split_clauses(raw_text, lang)
-    clauses = [c for c in clauses if len(c) > 40][:12]
+    clauses = split_clauses(raw_text, lang)[:10]
     
     if not clauses:
-        st.error("❌ No clauses found")
+        st.error("No clauses found")
         st.stop()
     
-    st.success(f"✅ {lang.upper()} | {len(clauses)} clauses")
+    st.success(f"✅ {len(clauses)} clauses | {lang.upper()}")
     
     results = []
-    progress = st.progress(0)
-    
     for i, clause in enumerate(clauses, 1):
-        with st.expander(f"Clause {i}"):
-            st.write(clause[:400])
+        with st.container():
+            st.markdown(f"**Clause {i}**")
+            st.write(clause[:500] + "..." if len(clause) > 500 else clause)
             
-            # NLP Analysis
-            entities = extract_entities(clause)
-            clause_type = classify_clause_type(clause)  # NOW WORKS
-            
-            # LLM Analysis
+            # Analysis
             analysis = analyze_clause_with_llm(clause, lang)
-            risk_level, score = calculate_ip_risk(analysis)
+            risk, score = calculate_ip_risk(analysis)
             
-            # EXACT OUTPUT FORMAT YOU WANTED
+            # YOUR EXACT SPEC ✅
+            st.markdown("---")
             st.markdown(f"""
-            **Ownership:** {analysis.get('ownership', 'N/A').title()}  
-            **Exclusivity:** {analysis.get('exclusivity', 'N/A').title()}  
-            **Favor:** {analysis.get('favor', 'N/A').title()}  
-            **Risk score (0–100):** **{score}**
+**Ownership:** {analysis.get('ownership', 'N/A').title()}  
+**Exclusivity:** {analysis.get('exclusivity', 'N/A').title()}  
+**Favor:** {analysis.get('favor', 'N/A').title()}  
+**Risk score (0–100):** **{score}**
             """)
             
-            st.markdown("### Why this is risky")
-            st.warning(analysis.get('risk_reason', 'No risk detected'))
+            st.markdown("**Why this is risky**")
+            st.warning(analysis.get('risk_reason', 'N/A'))
             
-            st.markdown("### Suggested Fix")
-            st.success(analysis.get('suggested_fix', 'OK as is'))
+            st.markdown("**Suggested Fix**")
+            st.success(analysis.get('suggested_fix', 'N/A'))
             
-            if entities.get('IP_TERMS'):
-                st.info(f"⚠️ IP Terms: {', '.join(entities['IP_TERMS'])}")
-            
-            results.append({
-                "clause": clause, "analysis": analysis, 
-                "risk": risk_level, "score": score,
-                "entities": entities, "type": clause_type
-            })
+            results.append({"clause": clause, "analysis": analysis, "risk": risk, "score": score})
         
-        progress.progress(i/len(clauses))
+        st.divider()
     
-    # Summary + Export
-    avg_score = sum(r["score"] for r in results) / len(results)
+    # Summary
+    avg = sum(r["score"] for r in results) / len(results)
     col1, col2 = st.columns(2)
-    col1.metric("Avg Risk Score", f"{avg_score:.0f}/100")
+    col1.metric("Composite Risk", f"{avg:.0f}/100")
     col2.metric("Clauses", len(results))
     
     log_audit(results, lang)
-    pdf_bytes = export_pdf(results)
-    st.download_button("📥 Download PDF", pdf_bytes, "contract_analysis.pdf")
+    st.download_button("📥 PDF Report", export_pdf(results), "report.pdf")
