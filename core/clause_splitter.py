@@ -1,22 +1,39 @@
-import nltk
-from nltk.tokenize import sent_tokenize
-from core.entities import extract_entities
+import re
 
 def split_clauses(text: str, lang: str = "en") -> list[str]:
-    """NLTK sent_tokenize + legal pattern split."""
-    # NLTK sentence tokenizer (excellent for legal docs)
-    sentences = sent_tokenize(text)
+    """Pure regex clause splitter - NO NLTK dependency."""
     
-    # Legal clause patterns
-    import re
+    if not text or len(text.strip()) < 50:
+        return []
+    
+    # Clean text
+    text = re.sub(r'\s+', ' ', text.strip())
+    
+    if lang == "hi":
+        # Hindi legal patterns: धारा, अनुच्छेद, numbers
+        patterns = [
+            r'धारा\s*\d+[^\.]*(?=\.|धारा|\n|$)',
+            r'अनुच्छेद\s*\d+[^\.]*(?=\.|अनुच्छेद|\n|$)',
+            r'परिच्छेद\s*\d+[^\.]*(?=\.|धारा|\n|$)',
+            r'\d+\.[^\.]*(?=\.|धारा|\n|$)'
+        ]
+    else:
+        # English legal patterns
+        patterns = [
+            r'(?:Section|Clause|Article)\s*\d+[^\.]*(?=\.|Section|Clause|\n|$)',
+            r'\d+\.[^\.]*(?=\.|Section|Clause|\n|$)'
+        ]
+    
     clauses = []
-    for sent in sentences:
-        if len(sent.strip()) > 30:
-            # Split on numbered clauses
-            clause_splits = re.split(r'(?i)(?:section|clause|धारा|अनुच्छेद)\s+\d+', sent)
-            clauses.extend([cs.strip() for cs in clause_splits if len(cs.strip()) > 40])
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
+        clauses.extend(matches)
     
+    # Fallback: Split by sentences (periods + 30+ chars)
     if not clauses:
-        clauses = [s.strip() for s in sentences if len(s.strip()) > 40][:15]
+        fallback = re.split(r'(?<=[।.?!])\s+', text)
+        clauses = [c.strip() for c in fallback if len(c) > 30]
     
-    return clauses
+    # Limit + clean
+    clauses = clauses[:15]
+    return [c.strip() for c in clauses if len(c) > 40]
