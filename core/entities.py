@@ -3,6 +3,7 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
+# Keyword lists for clause classification
 IP_PATTERNS = [
     r"intellectual\s+property|IP|ownership|assign|license|royalty|exclusive|non-compete",
     r"trade\s+secret|patent|copyright|trademark"
@@ -13,7 +14,7 @@ RIGHT_KW = ["right", "entitled", "may", "permitted"]
 PROHIBIT_KW = ["prohibited", "shall not", "cannot", "restrict"]
 
 def extract_entities(text: str) -> dict:
-    """Regex + NLTK keyword NER (no model dependency)."""
+    """Extract entities using regex + NLTK."""
     text_lower = text.lower()
     
     entities = {
@@ -23,15 +24,23 @@ def extract_entities(text: str) -> dict:
         "DATE": re.findall(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", text)
     }
     
-    # Clause classification
-    tokens = word_tokenize(text)
+    # Clause classification (THE MISSING FUNCTION)
+    tokens = word_tokenize(text.lower())
     scores = {"obligation": 0, "right": 0, "prohibition": 0}
+    
     for token in tokens:
-        token_lower = token.lower()
-        if token_lower in OBLIGATION_KW: scores["obligation"] += 1
-        if token_lower in RIGHT_KW: scores["right"] += 1
-        if token_lower in PROHIBIT_KW: scores["prohibition"] += 1
+        if token in OBLIGATION_KW: 
+            scores["obligation"] += 1
+        if token in RIGHT_KW: 
+            scores["right"] += 1
+        if token in PROHIBIT_KW: 
+            scores["prohibition"] += 1
     
     entities["CLAUSE_TYPE"] = max(scores, key=scores.get)
     
     return entities
+
+def classify_clause_type(text: str) -> str:
+    """Classify clause as obligation/right/prohibition."""
+    entities = extract_entities(text)
+    return entities["CLAUSE_TYPE"]
