@@ -24,11 +24,11 @@ def log_audit(results, language="unknown"):
         })
 
     if os.path.exists(AUDIT_FILE):
-        with open(AUDIT_FILE, "r", encoding="utf-8") as f:
-            try:
+        try:
+            with open(AUDIT_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            except json.JSONDecodeError:
-                data = []
+        except json.JSONDecodeError:
+            data = []
     else:
         data = []
 
