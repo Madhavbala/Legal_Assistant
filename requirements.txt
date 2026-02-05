@@ -1,0 +1,7 @@
+streamlit
+groq
+reportlab
+PyMuPDF
+python-docx
+langdetect
+spacy
